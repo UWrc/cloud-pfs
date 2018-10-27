@@ -10,3 +10,4 @@ Min Hwang
 Vishank Rughwani  
 David Liu  
 Larissa Gao
+Jimmy Beckett
