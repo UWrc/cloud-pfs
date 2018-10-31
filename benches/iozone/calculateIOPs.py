@@ -24,6 +24,7 @@ for filename in glob.glob('gpfs-iozone-[0-9]*threads.out'):
         for i, m in enumerate(matches):
             if m:
                 min_max_avg_totals[i] += float(m.group(1)) + float(m.group(2)) / 100
+    count /= 3
     result.append((filename, count, [x / count / record_size for x in min_max_avg_totals]))
 for r in sorted(result):  # sorted by threadcounts
     print('threadcount=' + str(int(re.match(r'.*?(\d+).*', r[0]).group(1))).rjust(3) + 
