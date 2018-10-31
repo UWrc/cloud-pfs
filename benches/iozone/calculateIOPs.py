@@ -6,29 +6,27 @@
 
 import glob
 import re
+from statistics import stdev, mean
 
 record_size_re = re.compile(r'\s*Each process writes a \d+ kByte file in (\d+) kByte records\s*')
 min_max_avg_re = [re.compile(r'\s*' + x + '\s*throughput per process\s*=\s*(\d+)\.(\d+) kB/sec\s*') for x in ['Min', 'Max', 'Avg']]
-result = []
-for filename in glob.glob('gpfs-iozone-[0-9]*threads.out'):  # iterate through all files
+threadcount_re = re.compile(r'.*?(\d+).*')
+column_width = 40
+for c in ['threadcount', 'min 4K IOPS / stdev', 'max 4K IOPS / stdev', 'avg 4K IOPS / stdev']:
+    print(c.ljust(column_width), end='')
+print()
+for filename in sorted(glob.glob('gpfs-iozone-[0-9]*threads.out'), 
+        key=lambda x: int(threadcount_re.match(x).group(1))):  # iterate through all files matching this pattern in sorted order
     record_size = -1
-    min_max_avg_totals = [0] * 3  # sum of all min/max/avg throughputs in the file
-    num_tests = 0  # total number of tests ran
+    min_max_avg = [[] for i in range(3)]
     for line in open(filename, 'r'):
         m = record_size_re.match(line)
         if m:
             record_size = int(m.group(1))  # kBytes
-        matches = [x.match(line) for x in min_max_avg_re]
-        if matches[0]:  # if min is there then max and avg are there too, so increment count
-            num_tests += 1
-        for i, m in enumerate(matches):
+        for i, m in enumerate([x.match(line) for x in min_max_avg_re]):
             if m:
-                min_max_avg_totals[i] += float(m.group(1)) + float(m.group(2)) / 100  # decimal number
-    result.append((filename, num_tests, [x / num_tests / record_size for x in min_max_avg_totals]))  # convert to IOPS by dividing KBytes/Sec by KBytes/record
-for r in sorted(result):  # sorted by threadcounts
-    iops = ['{:.2f}'.format(r[2][i]).rjust(10) for i in range(3)]  # format each IOPS as right justified with 2 decimal places
-    print('threadcount=' + str(int(re.match(r'.*?(\d+).*', r[0]).group(1))).rjust(3) +  # pull number of threads from file name
-            ', num tests=' + str(num_tests).rjust(6) + 
-            ', min 4K IOPS=' + iops[0] + 
-            ', max 4K IOPS=' + iops[1] + 
-            ', avg 4K IOPS=' + iops[2])
+                min_max_avg[i].append(float(m.group(1)) + float(m.group(2)) / 100)  # decimal number
+    print(str(int(threadcount_re.match(filename).group(1))).ljust(column_width), end='')  # print threadcount
+    for x in [(mean(min_max_avg[i]) / record_size, stdev(min_max_avg[i]) / record_size) for i in range(3)]:
+        print(('{:.2f}'.format(x[0]).ljust(11) + ' / ' + '{:.2f}'.format(x[1]).ljust(11)).ljust(column_width), end='')
+    print()
